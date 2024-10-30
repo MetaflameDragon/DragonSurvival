@@ -1,0 +1,51 @@
+name: Run PR tests
+
+on:
+  pull_request:
+    branches:
+      - '1.21.x'
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1000
+          fetch-tags: true
+
+      - name: Setup JDK 21
+        uses: neoforged/actions/setup-java@main
+        with:
+          java-version: 21
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          cache-read-only: false
+
+      - name: Make gradlew executable
+        run: chmod +x ./gradlew
+
+      - name: Check spotless
+        run: ./gradlew spotlessCheck
+      
+      - name: Build project
+        run: ./gradlew build
+
+      - name: Run game tests with Gradle
+        run: ./gradlew runGameTestServer
+
+      - name: Run JUnit tests with Gradle
+        run: ./gradlew test
+
+      - name: Store reports
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: reports
+          path: |
+            **/build/reports/
+            **/build/test-results/

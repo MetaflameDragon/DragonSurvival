@@ -5,9 +5,6 @@ import by.dragonsurvivalteam.dragonsurvival.common.capability.subcapabilities.Cl
 import by.dragonsurvivalteam.dragonsurvival.registry.DSContainers;
 import by.dragonsurvivalteam.dragonsurvival.server.containers.slots.ClawToolSlot;
 import by.dragonsurvivalteam.dragonsurvival.util.ToolUtils;
-import com.mojang.datafixers.util.Pair;
-import net.minecraft.core.Holder;
-import net.minecraft.core.registries.Registries;
 import net.minecraft.network.protocol.game.ClientboundContainerSetSlotPacket;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerPlayer;
@@ -21,11 +18,6 @@ import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.crafting.CraftingRecipe;
 import net.minecraft.world.item.crafting.RecipeHolder;
 import net.minecraft.world.item.crafting.RecipeType;
-import net.minecraft.world.item.enchantment.Enchantment;
-import net.minecraft.world.item.enchantment.EnchantmentHelper;
-import net.minecraft.world.item.enchantment.Enchantments;
-import net.neoforged.api.distmarker.Dist;
-import net.neoforged.api.distmarker.OnlyIn;
 import org.jetbrains.annotations.NotNull;
 
 import java.util.ArrayList;

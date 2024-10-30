@@ -18,34 +18,37 @@ java.toolchain.languageVersion = JavaLanguageVersion.of(21)
 
 runs {
 	configureEach {
-		systemProperty 'forge.logging.markers', 'REGISTRIES'
-		systemProperty 'forge.logging.console.level', 'debug'
+		systemProperty 'neoforge.logging.markers', 'REGISTRIES'
+		systemProperty 'neoforge.logging.console.level', 'debug'
 
 		modSource project.sourceSets.main
 	}
 
 	client {
-		systemProperty 'forge.enabledGameTestNamespaces', project.mod_id
-		programArguments '--username', 'Dev####'
+		systemProperty 'neoforge.enabledGameTestNamespaces', project.mod_id
+		arguments '--username', 'Dev'
 	}
 
 	client_static_username { // To be able to start a second client in parallel
 		runType 'client'
-		systemProperty 'forge.enabledGameTestNamespaces', project.mod_id
-		programArguments '--username', 'Dev'
+		systemProperty 'neoforge.enabledGameTestNamespaces', project.mod_id
+		arguments '--username', 'Dev'
 	}
 
 	server {
-		systemProperty 'forge.enabledGameTestNamespaces', project.mod_id
-		programArgument '--nogui'
+		systemProperty 'neoforge.enabledGameTestNamespaces', project.mod_id
+		arguments '--nogui'
 	}
 
 	gameTestServer {
-		systemProperty 'forge.enabledGameTestNamespaces', project.mod_id
+		systemProperty 'neoforge.enabledGameTestNamespaces', project.mod_id
 	}
 
 	data {
-		programArguments.addAll '--mod', project.mod_id, '--all', '--output', file('src/generated/resources/').getAbsolutePath(), '--existing', file('src/main/resources/').getAbsolutePath()
+		arguments.addAll '--mod', project.mod_id, '--all', '--output', file('src/generated/resources/').getAbsolutePath(), '--existing', file('src/main/resources/').getAbsolutePath()
+	}
+
+	junit {
 	}
 }
 
@@ -83,6 +86,9 @@ dependencies {
 	// Test
 //	implementation "maven.modrinth:sodium:mc1.21-0.6.0-beta.2-neoforge"
 //	implementation "curse.maven:irisshaders-455508:5765375" // 1.8 Beta 5
+
+	testImplementation 'org.junit.jupiter:junit-jupiter:5.7.1'
+	testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
 }
 
 tasks.withType(ProcessResources).configureEach {
@@ -126,6 +132,11 @@ minecraft {
 	accessTransformers {
 		file('src/main/resources/META-INF/accesstransformer.cfg')
 	}
+}
+
+// Enable JUnit in Gradle:
+test {
+	useJUnitPlatform()
 }
 
 // We use spotless for code formatting.
