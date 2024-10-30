@@ -269,12 +269,14 @@ public class ClientDragonRenderer {
                     }
                 }
                 if (!player.isInvisible()) {
-                    if (ServerFlightHandler.isGliding(player) || (player.isPassenger() && DragonStateProvider.isDragon(player.getVehicle()) && ServerFlightHandler.isGliding((Player) player.getVehicle()))) {
+                    boolean isPlayerGliding = ServerFlightHandler.isGliding(player);
+                    Entity playerVehicle = player.getVehicle();
+                    if (isPlayerGliding || (player.isPassenger() && DragonStateProvider.isDragon(playerVehicle) && ServerFlightHandler.isGliding((Player) playerVehicle))) {
                         float upRot = 0;
-                        if (ServerFlightHandler.isGliding(player)) {
+                        if (isPlayerGliding) {
                             upRot = Mth.clamp((float) (player.getDeltaMovement().y * 20), -80, 80);
                         } else {
-                            upRot = Mth.clamp((float) (player.getVehicle().getDeltaMovement().y * 20), -80, 80);
+                            upRot = Mth.clamp((float) (playerVehicle.getDeltaMovement().y * 20), -80, 80);
                         }
 
                         dummyDragon.prevXRot = Mth.lerp(0.1F, dummyDragon.prevXRot, upRot);
@@ -292,44 +294,87 @@ public class ClientDragonRenderer {
 
                         poseStack.mulPose(Axis.XN.rotationDegrees(dummyDragon.prevXRot));
 
-                        Vec3 vector3d1 = new Vec3(0, 0, 0);
-                        Vec3 vector3d = new Vec3(0, 0, 0);
-                        if (ServerFlightHandler.isGliding(player)) {
-                            vector3d1 = player.getDeltaMovement();
-                            vector3d = player.getViewVector(1f);
+                        float yRot;
+                        Vec3 deltaVel;
+                        Vec3 viewDir;
+                        if (isPlayerGliding) {
+                            yRot = player.getViewYRot(1f);
+                            deltaVel = player.getDeltaMovement();
+                            viewDir = player.getViewVector(1f);
                         } else {
-                            vector3d1 = player.getVehicle().getDeltaMovement();
-                            vector3d = player.getVehicle().getViewVector(1f);
-                        }
-                        double d0 = vector3d1.horizontalDistanceSqr();
-                        double d1 = vector3d.horizontalDistanceSqr();
-                        double d2 = (vector3d1.x * vector3d.x + vector3d1.z * vector3d.z) / Math.sqrt(d0 * d1);
-                        double d3 = vector3d1.x * vector3d.z - vector3d1.z * vector3d.x;
-
-                        float rot = Mth.clamp((float) (Math.signum(d3) * Math.acos(d2)) * 2, -1, 1);
-
-                        dummyDragon.prevZRot = Mth.lerp(0.1F, dummyDragon.prevZRot, rot);
-
-                        handler.getMovementData().prevZRot = dummyDragon.prevZRot;
-                        dummyDragon.prevZRot = Mth.clamp(dummyDragon.prevZRot, -1, 1);
-
-                        if (Float.isNaN(dummyDragon.prevZRot)) {
-                            dummyDragon.prevZRot = rot;
+                            yRot = playerVehicle.getViewYRot(1f);
+                            deltaVel = playerVehicle.getDeltaMovement();
+                            viewDir = playerVehicle.getViewVector(1f);
                         }
 
-                        if (Float.isNaN(dummyDragon.prevZRot)) {
-                            dummyDragon.prevZRot = 0;
+                        // Factor for interpolating to the target bank angle
+                        final float ROLL_VEL_LERP_FACTOR = 0.1F;
+                        // Minimum velocity to begin banking
+                        final double ROLL_VEL_INFLUENCE_MIN = 0.5D;
+                        // Maximum velocity at which point the bank angle has full effect
+                        final double ROLL_VEL_INFLUENCE_MAX = 2.0D;
+
+                        // Minimum view-velocity delta to start rolling
+                        final float ROLL_MIN_DELTA_DEG = 5;
+                        // Equivalent maximum, after which the bank angle is maximized
+                        final float ROLL_MAX_DELTA_DEG = 90;
+                        // Maximum roll angle
+                        final float ROLL_MAX_DEG = 60;
+                        // Exponent for targetRollNormalized (applied after normalizing relative to ROLL_MAX_DEG)
+                        // > 1: soft, starts banking slowly, increases rapidly with higher delta
+                        // < 1: sensitive, starts banking even when the difference is tiny, softer towards the limits
+                        final double ROLL_EXP = 0.7;
+
+                        float targetRollNormalized;
+
+                        // Note that we're working with the HORIZONTAL move delta
+                        if (deltaVel.horizontalDistanceSqr() > ROLL_VEL_INFLUENCE_MIN * ROLL_VEL_INFLUENCE_MIN) {
+                            float velAngle = (float) Math.atan2(-deltaVel.x, deltaVel.z) * Mth.RAD_TO_DEG;
+
+                            float viewToVelDeltaDeg = Mth.degreesDifference(velAngle, yRot);
+
+                            // Raw target roll, normalized
+                            targetRollNormalized = (float) Functions.deadzoneNormalized(viewToVelDeltaDeg, ROLL_MIN_DELTA_DEG, ROLL_MAX_DELTA_DEG);
+//                            if (player instanceof LocalPlayer localPlayer) {
+//                                localPlayer.sendSystemMessage(Component.literal("Raw target angle: %.2f".formatted(targetRollNormalized)));
+//                            }
+                            // Scale via exponent (still normalized)
+                            targetRollNormalized = Math.copySign((float) Math.pow(Math.abs(targetRollNormalized), ROLL_EXP), targetRollNormalized);
+//                            if (player instanceof LocalPlayer localPlayer) {
+//                                localPlayer.sendSystemMessage(Component.literal("Scaled via exponent: %.2f".formatted(targetRollNormalized)));
+//                            }
+                            // Scale by velocity influence
+                            float velInfluence = (float) Functions.inverseLerpClamped(
+                                    deltaVel.horizontalDistance(),
+                                    ROLL_VEL_INFLUENCE_MIN,
+                                    ROLL_VEL_INFLUENCE_MAX
+                            );
+                            targetRollNormalized *= velInfluence;
+//                            if (player instanceof LocalPlayer localPlayer) {
+//                                localPlayer.sendSystemMessage(Component.literal("Scaled by velocity: %.2f".formatted(targetRollNormalized)));
+//                            }
+                        } else {
+                            targetRollNormalized = 0;
+                        }
+
+                        float targetRollDeg = targetRollNormalized * ROLL_MAX_DEG * Mth.DEG_TO_RAD;
+
+                        // NaN/Inf prevention - snap directly
+                        if (!Double.isFinite(dummyDragon.prevZRot)) {
+                            dummyDragon.prevZRot = targetRollDeg;
+                        } else {
+                            dummyDragon.prevZRot = Mth.lerp(ROLL_VEL_LERP_FACTOR, dummyDragon.prevZRot, targetRollDeg);
                         }
 
                         handler.getMovementData().prevXRot = dummyDragon.prevXRot;
-                        handler.getMovementData().prevZRot = rot;
+                        handler.getMovementData().prevZRot = dummyDragon.prevZRot;
 
                         poseStack.mulPose(Axis.ZP.rotation(dummyDragon.prevZRot));
                     } else {
                         handler.getMovementData().prevZRot = 0;
                         handler.getMovementData().prevXRot = 0;
                     }
-                    if (player != minecraft.player || !Minecraft.getInstance().options.getCameraType().isFirstPerson() || !ServerFlightHandler.isGliding(player) || renderFirstPersonFlight) {
+                    if (player != minecraft.player || !Minecraft.getInstance().options.getCameraType().isFirstPerson() || !isPlayerGliding || renderFirstPersonFlight) {
                         dragonRenderer.render(dummyDragon, yaw, partialRenderTick, poseStack, renderTypeBuffer, eventLight);
                     }
                 }
@@ -573,6 +618,7 @@ public class ClientDragonRenderer {
             boolean isInputBack = rawInput.y < 0;
 
             if (hasMoveInput) {
+
                 // When providing move input, turn the body towards the input direction
                 var targetAngle = Math.toDegrees(Math.atan2(-rawInput.x, rawInput.y)) + viewYRot;
 

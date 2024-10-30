@@ -126,6 +126,58 @@ public class Functions {
         return Mth.wrapDegrees(start + diff * t);
     }
 
+    /**
+     * Inverse of lerp - the `t` from lerp(t, start, end). Not clamped.
+     * @param value Input value
+     * @param start Range start
+     * @param end Range end
+     * @return Normalized position of value between start and end, not clamped (extrapolated). 0 at start, 1 at end.
+     * Divides by zero when start == end - will return an infinity or NaN.
+     */
+    public static double inverseLerp(double value, double start, double end) {
+        return (value - start) / (end - start);
+    }
+    /**
+     * Inverse of lerp - the `t` from lerp(t, start, end). Clamped to 0..1.
+     * @param value Input value
+     * @param start Range start
+     * @param end Range end
+     * @return Normalized position of value between start and end, clamped to 0..1.
+     * Divides by zero when start == end - will return an infinity or NaN.
+     */
+    public static double inverseLerpClamped(double value, double start, double end) {
+        return Math.clamp(inverseLerp(value, start, end), 0, 1);
+    }
+
+    /**
+     * Inverse of lerp - the `t` from lerp(t, start, end). Clamped to 0..1. Returns 0 if start == end.
+     * @param value Input value
+     * @param start Range start
+     * @param end Range end
+     * @return Normalized position of value between start and end, clamped to 0..1.
+     * Does NOT divide by zero when start == end, and falls back to 0.
+     */
+    public static double inverseLerpClampedSafe(double value, double start, double end) {
+        // We specifically care about the difference being 0, as that's relevant for the division here
+        // Floats are weird, this might not be the same as start == end; hopefully this works
+        return start - end == 0 ? 0 : inverseLerpClamped(value, start, end);
+    }
+
+    /**
+     * Adds a deadzone to value, normalizing it within ranges -maxRange..-deadzone and deadzone..maxRange.
+     * <br/>
+     * When value is between -deadzone..deadzone, the output is 0.
+     * When within the negative or positive range from deadzone to maxRange, the output is an inverse lerp
+     * between -1..0 and 0..1 respectively.
+     * The result is clamped to -1..1
+     * @param value Input value
+     * @param deadzone Minimum in both directions - deadzone
+     * @param maxRange Maximum in both directions
+     * @return Clamped inverse lerp of value between -maxRange..maxRange, with 0 offset by deadzone.
+     */
+    public static double deadzoneNormalized(double value, double deadzone, double maxRange) {
+        return Math.copySign(inverseLerpClamped(Math.abs(value), deadzone, maxRange), value);
+    }
 
     public static ListTag newDoubleList(double... pNumbers) {
         ListTag listtag = new ListTag();
